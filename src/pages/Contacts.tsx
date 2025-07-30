@@ -259,7 +259,6 @@ const Contacts = () => {
                     <SelectValue placeholder="Selecione um imóvel" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum imóvel específico</SelectItem>
                     {properties.map((property) => (
                       <SelectItem key={property.id} value={property.id}>
                         {property.description} - {new Intl.NumberFormat('pt-BR', {
