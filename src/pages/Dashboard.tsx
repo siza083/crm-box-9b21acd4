@@ -59,20 +59,35 @@ const Dashboard = () => {
         .lte('created_at', filterEndDate.toISOString());
 
       // Get sales (contacts with sale_date within date range)
-      const { data: salesData } = await supabase
+      const { data: salesData, error: salesError } = await supabase
         .from('contacts')
-        .select('sale_date, sale_value, created_at, property_id, properties(price, commission_percentage)')
+        .select(`
+          sale_date, 
+          sale_value, 
+          created_at, 
+          property_id,
+          properties!inner(price, commission_percentage)
+        `)
         .eq('user_id', user?.id)
         .not('sale_date', 'is', null)
         .gte('sale_date', filterStartDate.toISOString())
         .lte('sale_date', filterEndDate.toISOString());
 
+      console.log('Sales data:', salesData);
+      console.log('Sales error:', salesError);
+
       // Calculate stats
       const salesCompleted = salesData?.length || 0;
-      const totalVGV = salesData?.reduce((sum, sale) => sum + (sale.sale_value || 0), 0) || 0;
+      const totalVGV = salesData?.reduce((sum, sale) => {
+        // Use property price as sale value if sale_value is not set
+        const saleAmount = sale.sale_value || sale.properties?.price || 0;
+        return sum + saleAmount;
+      }, 0) || 0;
+      
       const totalCommissions = salesData?.reduce((sum, sale) => {
-        const property = sale.properties as any;
-        const commissionAmount = (sale.sale_value || 0) * ((property?.commission_percentage || 0) / 100);
+        const saleAmount = sale.sale_value || sale.properties?.price || 0;
+        const commissionPercentage = sale.properties?.commission_percentage || 0;
+        const commissionAmount = saleAmount * (commissionPercentage / 100);
         return sum + commissionAmount;
       }, 0) || 0;
 
