@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { TrendingUp, Users, DollarSign, Percent, Calendar, BarChart3 } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { TrendingUp, Users, DollarSign, Percent, Calendar, BarChart3, Filter } from 'lucide-react';
+import { format, subDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface DashboardStats {
@@ -26,37 +29,43 @@ const Dashboard = () => {
     averageSaleCycle: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   useEffect(() => {
     if (user) {
       loadDashboardStats();
     }
-  }, [user]);
+  }, [user, startDate, endDate]);
 
   const loadDashboardStats = async () => {
     try {
       setLoading(true);
-      const thirtyDaysAgo = subDays(new Date(), 30);
+      const filterStartDate = parseISO(startDate);
+      const filterEndDate = parseISO(endDate);
 
-      // Get total contacts
+      // Get total contacts (within date range for new contacts)
       const { count: totalContacts } = await supabase
         .from('contacts')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user?.id);
 
-      // Get new contacts (last 30 days)
+      // Get new contacts (within date range)
       const { count: newContacts } = await supabase
         .from('contacts')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user?.id)
-        .gte('created_at', thirtyDaysAgo.toISOString());
+        .gte('created_at', filterStartDate.toISOString())
+        .lte('created_at', filterEndDate.toISOString());
 
-      // Get sales (contacts with sale_date)
+      // Get sales (contacts with sale_date within date range)
       const { data: salesData } = await supabase
         .from('contacts')
-        .select('sale_date, sale_value, property_id, properties(price, commission_percentage)')
+        .select('sale_date, sale_value, created_at, property_id, properties(price, commission_percentage)')
         .eq('user_id', user?.id)
-        .not('sale_date', 'is', null);
+        .not('sale_date', 'is', null)
+        .gte('sale_date', filterStartDate.toISOString())
+        .lte('sale_date', filterEndDate.toISOString());
 
       // Calculate stats
       const salesCompleted = salesData?.length || 0;
@@ -69,18 +78,18 @@ const Dashboard = () => {
 
       const conversionRate = totalContacts ? (salesCompleted / totalContacts) * 100 : 0;
 
-      // Calculate average sale cycle (last 30 sales)
-      const recentSales = salesData
-        ?.filter(sale => sale.sale_date)
+      // Calculate average sale cycle (from created_at to sale_date)
+      const salesWithCycle = salesData
+        ?.filter(sale => sale.sale_date && sale.created_at)
         .slice(-30) || [];
 
-      const averageSaleCycle = recentSales.length > 0 
-        ? recentSales.reduce((sum, sale) => {
+      const averageSaleCycle = salesWithCycle.length > 0 
+        ? salesWithCycle.reduce((sum, sale) => {
             const saleDate = new Date(sale.sale_date!);
-            const createdDate = new Date(); // We'd need created_at from contacts
+            const createdDate = new Date(sale.created_at!);
             const daysDiff = Math.abs(saleDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
             return sum + daysDiff;
-          }, 0) / recentSales.length
+          }, 0) / salesWithCycle.length
         : 0;
 
       setStats({
@@ -115,6 +124,43 @@ const Dashboard = () => {
         </p>
       </div>
 
+      {/* Filtro de Datas */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            Filtro de Período
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+              <Label htmlFor="start-date">Data Inicial</Label>
+              <Input
+                id="start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="end-date">Data Final</Label>
+              <Input
+                id="end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <Button onClick={loadDashboardStats} disabled={loading}>
+                {loading ? 'Carregando...' : 'Atualizar'}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -124,7 +170,7 @@ const Dashboard = () => {
           <CardContent>
             <div className="text-2xl font-bold">{stats.newContacts}</div>
             <p className="text-xs text-muted-foreground">
-              Últimos 30 dias
+              Período selecionado
             </p>
           </CardContent>
         </Card>

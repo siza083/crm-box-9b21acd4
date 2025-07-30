@@ -111,11 +111,39 @@ const Pipeline = () => {
     const contactId = active.id as string;
     const newStageId = over.id as string;
 
-    // Update contact stage in database
+    // Check if moving to "Venda Ganha" stage
+    const vendaGanhaStage = stages.find(stage => stage.name === 'Venda Ganha');
+    const isMovingToSale = newStageId === vendaGanhaStage?.id;
+
+    // Get contact details for sale
+    const contact = contacts.find(c => c.id === contactId);
+    
     try {
+      let updateData: any = { stage_id: newStageId };
+
+      // If moving to "Venda Ganha", prompt for sale value and set sale date
+      if (isMovingToSale && contact) {
+        const propertyPrice = contact.properties?.price || 0;
+        const saleValue = propertyPrice > 0 
+          ? propertyPrice 
+          : parseFloat(prompt(`Digite o valor da venda para ${contact.name}:`) || '0');
+
+        if (saleValue > 0) {
+          updateData.sale_date = new Date().toISOString();
+          updateData.sale_value = saleValue;
+        } else {
+          toast({
+            title: "Erro",
+            description: "Valor de venda inválido",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('contacts')
-        .update({ stage_id: newStageId })
+        .update(updateData)
         .eq('id', contactId);
 
       if (error) throw error;
@@ -124,14 +152,18 @@ const Pipeline = () => {
       setContacts(prev => 
         prev.map(contact => 
           contact.id === contactId 
-            ? { ...contact, stage_id: newStageId }
+            ? { ...contact, ...updateData }
             : contact
         )
       );
 
+      const message = isMovingToSale 
+        ? "Venda registrada com sucesso!" 
+        : "Contato movido com sucesso!";
+
       toast({
         title: "Sucesso",
-        description: "Contato movido com sucesso!",
+        description: message,
       });
     } catch (error) {
       console.error('Error updating contact stage:', error);
