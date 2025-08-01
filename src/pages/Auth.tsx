@@ -7,11 +7,22 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import logoBlack from '@/assets/logo-black.png';
+import logoWhite from '@/assets/logo-white.png';
+import { useTheme } from '@/hooks/useTheme';
 
 const Auth = () => {
   const { user, signIn, signUp } = useAuth();
   const { toast } = useToast();
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
+
+  const getCurrentLogo = () => {
+    if (theme === 'dark') return logoWhite;
+    if (theme === 'light') return logoBlack;
+    // For system theme, check if dark mode is active
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? logoWhite : logoBlack;
+  };
 
   if (user) {
     return <Navigate to="/" replace />;
@@ -69,7 +80,10 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">CRM Box</CardTitle>
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <img src={getCurrentLogo()} alt="CRM Box Logo" className="h-8" />
+            <CardTitle className="text-2xl font-bold">CRM Box</CardTitle>
+          </div>
           <CardDescription>Sistema de gestão imobiliária</CardDescription>
         </CardHeader>
         <CardContent>
