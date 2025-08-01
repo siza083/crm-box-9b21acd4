@@ -7,12 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { useTheme } from '@/hooks/useTheme';
-
 const Auth = () => {
   const { user, signIn, signUp } = useAuth();
   const { toast } = useToast();
-  const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
 
 
